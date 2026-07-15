@@ -1,0 +1,96 @@
+// =============================================================================
+// Surf Library — design tokens
+//
+// Figma "Surf Library" (https://www.figma.com/design/t50jxaPsMihkO9FZAFDwsP)
+// was not reachable at build time, so these are an intentional coastal-library
+// system (deep-sea teal + warm paper, Fraunces/Inter). To match the Figma
+// exactly, replace the values below with Figma Dev Mode tokens — every
+// component reads them through the `--sl-*` custom properties, so nothing else
+// needs to change.
+// =============================================================================
+
+// --- palette -----------------------------------------------------------------
+$color-paper:          #f7f4ee; // warm off-white page background
+$color-surface:        #ffffff;
+$color-surface-sunk:   #f1ece3;
+$color-ink:            #10243e; // deep navy text
+$color-muted:          #5b6b7d;
+$color-faint:          #8a97a5;
+
+$color-primary:        #0e7490; // sea teal
+$color-primary-strong: #0b5563;
+$color-primary-soft:   #e0f2f6;
+
+$color-accent:         #e2603b; // sunset coral
+$color-accent-soft:    #fbe7de;
+
+$color-success:        #2f7a55;
+$color-success-soft:   #e4f2ea;
+$color-danger:         #c0392b;
+$color-danger-soft:    #fbe4e1;
+$color-warning:        #b7791f;
+
+$color-border:         #e7e1d6; // warm hairline
+$color-border-cool:    #dce4ea;
+
+// --- typography --------------------------------------------------------------
+$font-display: 'Fraunces', 'Georgia', 'Times New Roman', serif;
+$font-body:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+// --- radius / elevation ------------------------------------------------------
+$radius-sm:  8px;
+$radius:     14px;
+$radius-lg:  20px;
+$radius-pill: 999px;
+
+$shadow-sm:  0 1px 2px rgba(16, 36, 62, 0.06);
+$shadow:     0 6px 20px rgba(16, 36, 62, 0.08);
+$shadow-lg:  0 18px 44px rgba(16, 36, 62, 0.14);
+
+// --- spacing scale -----------------------------------------------------------
+$space-1: 4px;
+$space-2: 8px;
+$space-3: 12px;
+$space-4: 16px;
+$space-5: 24px;
+$space-6: 32px;
+$space-7: 48px;
+$space-8: 64px;
+
+// --- expose as CSS custom properties (runtime themeable) ---------------------
+:root {
+  --sl-paper: #{$color-paper};
+  --sl-surface: #{$color-surface};
+  --sl-surface-sunk: #{$color-surface-sunk};
+  --sl-ink: #{$color-ink};
+  --sl-muted: #{$color-muted};
+  --sl-faint: #{$color-faint};
+
+  --sl-primary: #{$color-primary};
+  --sl-primary-strong: #{$color-primary-strong};
+  --sl-primary-soft: #{$color-primary-soft};
+
+  --sl-accent: #{$color-accent};
+  --sl-accent-soft: #{$color-accent-soft};
+
+  --sl-success: #{$color-success};
+  --sl-success-soft: #{$color-success-soft};
+  --sl-danger: #{$color-danger};
+  --sl-danger-soft: #{$color-danger-soft};
+  --sl-warning: #{$color-warning};
+
+  --sl-border: #{$color-border};
+  --sl-border-cool: #{$color-border-cool};
+
+  --sl-font-display: #{$font-display};
+  --sl-font-body: #{$font-body};
+
+  --sl-radius-sm: #{$radius-sm};
+  --sl-radius: #{$radius};
+  --sl-radius-lg: #{$radius-lg};
+  --sl-radius-pill: #{$radius-pill};
+
+  --sl-shadow-sm: #{$shadow-sm};
+  --sl-shadow: #{$shadow};
+  --sl-shadow-lg: #{$shadow-lg};
+}

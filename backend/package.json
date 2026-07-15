@@ -1,0 +1,27 @@
+{
+  "name": "surf-library-backend",
+  "version": "1.0.0",
+  "main": "dist/src/server.js",
+  "scripts": {
+    "build": "tsc -project tsconfig.json",
+    "start": "node ./dist/src/server.js",
+    "dev": "ts-node ./src/server.ts",
+    "seed:admin": "node ./dist/src/seed-admin.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^8.5.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.26.2",
+    "fastify-plugin": "^4.5.1",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.5",
+    "reflect-metadata": "^0.1.13",
+    "typeorm": "^0.3.20"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^18.19.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}

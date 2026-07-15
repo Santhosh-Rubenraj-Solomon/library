@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+**/node_modules/
+
+# build output
+dist/
+backend/dist/
+frontend/dist/
+frontend/.angular/
+
+# env / secrets — never commit real secrets (see Task 4)
+.env
+**/.env
+!**/.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
