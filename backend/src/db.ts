@@ -3,6 +3,7 @@ import { AppDataSource } from "./data-source";
 import { Library } from "./entity/books";
 import { Lend } from "./entity/lends";
 import { Users } from "./entity/users";
+import { Reservation } from "./entity/reservations";
 
 export default fp(async (server) => {
   if (!AppDataSource.isInitialized) {
@@ -13,5 +14,6 @@ export default fp(async (server) => {
     library: AppDataSource.getRepository(Library),
     lendrecords: AppDataSource.getRepository(Lend),
     userrecords: AppDataSource.getRepository(Users),
+    reservationrecords: AppDataSource.getRepository(Reservation),
   });
 });

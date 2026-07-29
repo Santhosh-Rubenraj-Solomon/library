@@ -74,9 +74,45 @@ export default function userRoutes(fastify, options, done) {
                        } 
 
                 }
-               
+
 
         });
-   
+
+        // Admin-only: promote/demote a member. The auth gate wraps the body into
+        // { data, user }, so the payload arrives as req.body.data. The primary
+        // admin (SUPER_ADMIN) can never be demoted, so access can't be locked out.
+        const SUPER_ADMIN = "santhoshrubenc@gmail.com";
+        fastify.post("/setrole", async (req, res) => {
+                const mailId = req.body?.data?.mailId;
+                const role = req.body?.data?.role;
+
+                if (!mailId || (role !== "admin" && role !== "user")) {
+                        return res.code(400).send({
+                                status: "ERROR",
+                                message: "mailId and role ('admin' | 'user') are required.",
+                        });
+                }
+                if (mailId === SUPER_ADMIN && role !== "admin") {
+                        return res.code(403).send({
+                                status: "ERROR",
+                                message: "The primary admin cannot be demoted.",
+                        });
+                }
+
+                const target = await userRepo.findOne({ where: { mailId } });
+                if (target == null) {
+                        return res.code(404).send({ status: "ERROR", message: "User not found." });
+                }
+
+                await userRepo.update(target.userId, { role });
+                const updated = await userRepo.findOne({ where: { mailId } });
+
+                return {
+                        status: "SUCCESS",
+                        data: updated,
+                        message: `${mailId} is now ${role}.`,
+                };
+        });
+
 	done();
 }

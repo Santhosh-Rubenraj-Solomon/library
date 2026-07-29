@@ -15,7 +15,7 @@ import { NotificationsComponent } from './shared/notifications/notifications.com
     </main>
     <footer class="site-footer">
       <div class="container">
-        <span>Surf Library</span>
+        <span>Surfboard Library</span>
         <span class="muted">Load-balanced across backend-1 / -2 / -3 via nginx</span>
       </div>
     </footer>

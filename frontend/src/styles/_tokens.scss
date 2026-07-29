@@ -1,40 +1,37 @@
 // =============================================================================
-// Surf Library — design tokens
+// Surfboard Library — design tokens
 //
-// Figma "Surf Library" (https://www.figma.com/design/t50jxaPsMihkO9FZAFDwsP)
-// was not reachable at build time, so these are an intentional coastal-library
-// system (deep-sea teal + warm paper, Fraunces/Inter). To match the Figma
-// exactly, replace the values below with Figma Dev Mode tokens — every
-// component reads them through the `--sl-*` custom properties, so nothing else
-// needs to change.
+// Themed to Surfboard Payments' brand: royal blue (#0E44E1), deep teal ink
+// (#041C23), warm paper (#F7F2F2), mint (#7ACCC8) — pulled from the live brand.
+// Every component reads these through the `--sl-*` custom properties.
 // =============================================================================
 
 // --- palette -----------------------------------------------------------------
-$color-paper:          #f7f4ee; // warm off-white page background
+$color-paper:          #e7eefb; // Surfboard blue base
 $color-surface:        #ffffff;
-$color-surface-sunk:   #f1ece3;
-$color-ink:            #10243e; // deep navy text
-$color-muted:          #5b6b7d;
-$color-faint:          #8a97a5;
+$color-surface-sunk:   #dbe4f5;
+$color-ink:            #041c23; // Surfboard deep teal ink
+$color-muted:          #4d5a6b;
+$color-faint:          #8792a6;
 
-$color-primary:        #0e7490; // sea teal
-$color-primary-strong: #0b5563;
-$color-primary-soft:   #e0f2f6;
+$color-primary:        #0e44e1; // Surfboard royal blue
+$color-primary-strong: #0d33b8;
+$color-primary-soft:   #e7edff;
 
-$color-accent:         #e2603b; // sunset coral
-$color-accent-soft:    #fbe7de;
+$color-accent:         #0aa39a; // Surfboard mint-teal (deepened for contrast)
+$color-accent-soft:    #dff3f1;
 
-$color-success:        #2f7a55;
-$color-success-soft:   #e4f2ea;
-$color-danger:         #c0392b;
+$color-success:        #1c7c4a;
+$color-success-soft:   #e3f2ea;
+$color-danger:         #c62828;
 $color-danger-soft:    #fbe4e1;
 $color-warning:        #b7791f;
 
-$color-border:         #e7e1d6; // warm hairline
-$color-border-cool:    #dce4ea;
+$color-border:         #cfd9ef; // cool blue hairline
+$color-border-cool:    #cbd6ee;
 
 // --- typography --------------------------------------------------------------
-$font-display: 'Fraunces', 'Georgia', 'Times New Roman', serif;
+$font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 $font-body:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
 // --- radius / elevation ------------------------------------------------------
@@ -43,9 +40,9 @@ $radius:     14px;
 $radius-lg:  20px;
 $radius-pill: 999px;
 
-$shadow-sm:  0 1px 2px rgba(16, 36, 62, 0.06);
-$shadow:     0 6px 20px rgba(16, 36, 62, 0.08);
-$shadow-lg:  0 18px 44px rgba(16, 36, 62, 0.14);
+$shadow-sm:  0 1px 2px rgba(4, 28, 35, 0.06);
+$shadow:     0 6px 20px rgba(4, 28, 35, 0.09);
+$shadow-lg:  0 18px 44px rgba(4, 28, 35, 0.15);
 
 // --- spacing scale -----------------------------------------------------------
 $space-1: 4px;

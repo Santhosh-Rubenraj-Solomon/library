@@ -1,4 +1,4 @@
-import { getRepository } from "typeorm";
+import { getRepository, In } from "typeorm";
 import { Library } from "../entity/books";
 import { Lend } from "../entity/lends";
 import { Users } from "../entity/users";
@@ -9,6 +9,7 @@ export default function lendRoutes(fastify, options, done) {
 	const libRepo = fastify.db.library;
 	const userRepo = fastify.db.userrecords;
 	const lendRepo = fastify.db.lendrecords;
+	const resRepo = fastify.db.reservationrecords;
 
 
 	fastify.post("/lendbook", async (req, res) => {
@@ -39,11 +40,25 @@ export default function lendRoutes(fastify, options, done) {
 			}
 
 			if (findBook != null && findBook.available === true) {
-			
-					const lendBook = await lendRepo.save(book);
 
-	 				const updatedBook =await libRepo.update(findBook.bookId,{available:false});
-                                        console.log('update availability',updatedBook.available);      
+					// Queue gate: if someone is next in line ("ready"), only they may take it.
+					const ready = await resRepo.findOne({ where: { bookName: book.bookName, status: "ready" } });
+					if (ready && ready.userId !== req.body.user.userId) {
+						throw new Error(`${book.bookName} is reserved for the next person in the queue.`);
+					}
+
+					// 14-day loan period.
+					const due = new Date(book.lendDate);
+					due.setDate(due.getDate() + 14);
+
+					const lendBook = await lendRepo.save({ ...book, dueDate: due });
+					await libRepo.update(findBook.bookId, { available: false });
+
+					// Clear the borrower's own reservation for this book, if any.
+					const mine = await resRepo.findOne({
+						where: { bookName: book.bookName, userId: req.body.user.userId, status: In(["waiting", "ready"]) },
+					});
+					if (mine) await resRepo.update(mine.reservationId, { status: "fulfilled" });
 
 					return {
 						status: "SUCCESS",

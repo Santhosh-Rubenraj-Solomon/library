@@ -8,6 +8,7 @@ import libraryRoutes from "./routes/library-routes";
 import lendRoutes from "./routes/lend-routes";
 import userRoutes from "./routes/user-routes";
 import returnRoutes from "./routes/return-routes";
+import reservationRoutes from "./routes/reservation-routes";
 import { routes, unauthorizedRoutes, adminRoutes } from "./rts";
 
 dotenv.config();
@@ -26,6 +27,7 @@ fastify.register(libraryRoutes);
 fastify.register(lendRoutes);
 fastify.register(userRoutes);
 fastify.register(returnRoutes);
+fastify.register(reservationRoutes);
 
 // Make load balancing visible: stamp the serving instance on every response.
 fastify.addHook("onSend", async (_req, reply) => {

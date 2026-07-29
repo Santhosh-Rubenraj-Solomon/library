@@ -9,6 +9,7 @@ export default function returnRoutes(fastify, options, done) {
 	const lendRepo = fastify.db.lendrecords;
 	const libRepo = fastify.db.library;
 	const userRepo = fastify.db.userrecords;
+	const resRepo = fastify.db.reservationrecords;
 
 	fastify.post("/returnbook", async (req, res) => {
 		
@@ -44,7 +45,11 @@ export default function returnRoutes(fastify, options, done) {
                               const updateStatus = await lendRepo.update(lendInfo.lendId,{returnDate: new Date(), returned : true});
     
                               const updateAvailability = await libRepo.update(findBook.bookId, {available : true })
-                               
+
+                              // Promote the next person in the waitlist to "ready".
+                              const nextInQueue = await resRepo.findOne({ where: { bookName, status: "waiting" }, order: { createdAt: "ASC" } });
+                              if (nextInQueue) await resRepo.update(nextInQueue.reservationId, { status: "ready" });
+
                               return {
                                       status: "SUCCESS",
                                       data: updateStatus,

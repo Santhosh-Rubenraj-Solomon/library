@@ -10,26 +10,9 @@ import { AuthService } from '../../core/auth.service';
   template: `
     <header class="nav">
       <div class="container nav-inner">
-        <a class="brand" routerLink="/catalog" aria-label="Surf Library home">
-          <span class="mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
-              <path
-                d="M2 15c3 0 3-3 6-3s3 3 6 3 3-3 6-3"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-              />
-              <path
-                d="M2 19c3 0 3-3 6-3s3 3 6 3 3-3 6-3"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                opacity="0.5"
-              />
-              <rect x="9" y="3" width="3.4" height="8" rx="1" fill="currentColor" />
-            </svg>
-          </span>
-          <span class="word">Surf<span class="thin">Library</span></span>
+        <a class="brand" routerLink="/catalog" aria-label="Surfboard Library home">
+          <img class="mark" src="assets/surfboard-logo.png" alt="" width="34" height="34" />
+          <span class="word">Surfboard<span class="thin">Library</span></span>
         </a>
 
         <nav class="links">
@@ -84,14 +67,10 @@ import { AuthService } from '../../core/auth.service';
       }
       .brand:hover { text-decoration: none; }
       .mark {
-        display: grid;
-        place-items: center;
-        width: 38px;
-        height: 38px;
-        border-radius: 11px;
-        background: linear-gradient(140deg, var(--sl-primary), var(--sl-primary-strong));
-        color: #fff;
-        box-shadow: var(--sl-shadow-sm);
+        width: 34px;
+        height: 34px;
+        object-fit: contain;
+        display: block;
       }
       .word { font-size: 1.22rem; font-weight: 600; letter-spacing: -0.02em; }
       .word .thin { color: var(--sl-primary-strong); margin-left: 2px; }

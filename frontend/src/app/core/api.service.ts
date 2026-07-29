@@ -9,6 +9,7 @@ import {
   BookInput,
   BookQuery,
   Lend,
+  Reservation,
   User,
 } from '../models';
 
@@ -98,6 +99,11 @@ export class ApiService {
     return this.http.get<ApiResponse<User[]>>(`${this.base}/getusers`);
   }
 
+  /** POST /setrole — promote/demote a member (admin only). */
+  setRole(mailId: string, role: 'admin' | 'user'): Observable<ApiResponse<User>> {
+    return this.http.post<ApiResponse<User>>(`${this.base}/setrole`, { mailId, role });
+  }
+
   /** GET /getlendedbooks — currently lent. */
   getLendedBooks(): Observable<ApiResponse<Lend[]>> {
     return this.http.get<ApiResponse<Lend[]>>(`${this.base}/getlendedbooks`);
@@ -106,5 +112,27 @@ export class ApiService {
   /** GET /getreturnedbooks. */
   getReturnedBooks(): Observable<ApiResponse<Lend[]>> {
     return this.http.get<ApiResponse<Lend[]>>(`${this.base}/getreturnedbooks`);
+  }
+
+  // --- reservations / waitlist ---------------------------------------------
+
+  /** POST /reservebook — join the waitlist for an on-loan book. */
+  reserveBook(bookName: string): Observable<ApiResponse<Reservation>> {
+    return this.http.post<ApiResponse<Reservation>>(`${this.base}/reservebook`, { bookName });
+  }
+
+  /** GET /myreservations — the caller's active reservations with live position. */
+  getMyReservations(): Observable<ApiResponse<Reservation[]>> {
+    return this.http.get<ApiResponse<Reservation[]>>(`${this.base}/myreservations`);
+  }
+
+  /** POST /cancelreservation. */
+  cancelReservation(bookName: string): Observable<ApiResponse<null>> {
+    return this.http.post<ApiResponse<null>>(`${this.base}/cancelreservation`, { bookName });
+  }
+
+  /** GET /getreservations — admin: the whole active waitlist. */
+  getReservations(): Observable<ApiResponse<Reservation[]>> {
+    return this.http.get<ApiResponse<Reservation[]>>(`${this.base}/getreservations`);
   }
 }

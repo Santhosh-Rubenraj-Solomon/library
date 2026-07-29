@@ -3,6 +3,7 @@ import { DataSource } from "typeorm";
 import { Library } from "./entity/books";
 import { Lend } from "./entity/lends";
 import { Users } from "./entity/users";
+import { Reservation } from "./entity/reservations";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -13,5 +14,5 @@ export const AppDataSource = new DataSource({
   database: process.env.DBNAME || "library",
   synchronize: true, // demo only — replace with migrations for production
   logging: false,
-  entities: [Library, Lend, Users],
+  entities: [Library, Lend, Users, Reservation],
 });

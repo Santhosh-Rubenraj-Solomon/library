@@ -35,7 +35,19 @@ export interface Lend {
   mailId: string;
   lendDate: string;
   returnDate: string | null;
+  dueDate?: string | null;
   returned: boolean;
+}
+
+/** A spot in a book's waitlist (entity/reservations.ts). */
+export interface Reservation {
+  reservationId?: string;
+  bookName: string;
+  mailId?: string;
+  status: 'waiting' | 'ready' | string;
+  position?: number;
+  createdAt?: string;
+  dueDate?: string | null;
 }
 
 /** Decoded `user` claim carried inside the signin JWT. */

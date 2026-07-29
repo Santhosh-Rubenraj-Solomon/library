@@ -7,9 +7,10 @@ import { Book } from '../../models';
   selector: 'app-book-card',
   standalone: true,
   template: `
-    <article class="book-card card">
+    <article class="book-card card" [style.animation-delay.ms]="(index % 12) * 45">
       <div class="cover" [style.background]="cover">
         <span class="spine"></span>
+        <span class="sheen"></span>
         <span class="initials">{{ initials }}</span>
         <span class="lang">{{ book.language }}</span>
       </div>
@@ -23,16 +24,21 @@ import { Book } from '../../models';
         <div class="bc-foot">
           @if (book.available) {
             <span class="badge ok"><span class="dot"></span> Available</span>
+            <button class="btn sm" [disabled]="loading" (click)="borrow.emit(book)">Borrow</button>
+          } @else if (queueStatus === 'ready') {
+            <span class="badge ok"><span class="dot"></span> Ready for you</span>
+            <button class="btn sm" [disabled]="loading" (click)="borrow.emit(book)">
+              {{ loading ? 'Borrowing…' : 'Borrow now' }}
+            </button>
+          } @else if (queuePos) {
+            <span class="badge out"><span class="dot"></span> On loan</span>
+            <span class="badge role">In queue · #{{ queuePos }}</span>
           } @else {
             <span class="badge out"><span class="dot"></span> On loan</span>
+            <button class="btn ghost sm" [disabled]="reserving" (click)="reserve.emit(book)">
+              {{ reserving ? 'Reserving…' : 'Reserve' }}
+            </button>
           }
-          <button
-            class="btn sm"
-            [disabled]="!book.available || loading"
-            (click)="borrow.emit(book)"
-          >
-            {{ book.available ? 'Borrow' : 'Unavailable' }}
-          </button>
         </div>
       </div>
     </article>
@@ -43,15 +49,57 @@ import { Book } from '../../models';
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        transition: transform 0.12s ease, box-shadow 0.18s ease;
+        box-shadow: var(--sl-shadow-sm);
+        transition: transform 0.16s ease, box-shadow 0.2s ease;
       }
-      .book-card:hover { transform: translateY(-3px); box-shadow: var(--sl-shadow); }
+      .book-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 42px -16px rgba(14, 68, 225, 0.42);
+      }
+      .book-card:hover .sheen {
+        transform: translateX(320%) skewX(-18deg);
+      }
       .cover {
         position: relative;
-        height: 132px;
+        height: 148px;
         display: grid;
         place-items: center;
         color: #fff;
+        overflow: hidden;
+      }
+      .cover::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 42%, rgba(0, 0, 0, 0.16));
+        pointer-events: none;
+      }
+      .cover .sheen {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: -60%;
+        width: 45%;
+        background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+        transform: translateX(0) skewX(-18deg);
+        transition: transform 0.6s ease;
+        pointer-events: none;
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .book-card {
+          opacity: 0;
+          animation: cardIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes cardIn {
+          from {
+            opacity: 0;
+            transform: translateY(14px);
+          }
+          to {
+            opacity: 1;
+            transform: none;
+          }
+        }
       }
       .cover .spine {
         position: absolute;
@@ -106,15 +154,21 @@ import { Book } from '../../models';
 export class BookCardComponent {
   @Input({ required: true }) book!: Book;
   @Input() loading = false;
+  @Input() index = 0;
+  @Input() queuePos: number | null = null;
+  @Input() queueStatus: string | null = null;
+  @Input() reserving = false;
   @Output() borrow = new EventEmitter<Book>();
+  @Output() reserve = new EventEmitter<Book>();
 
+  // Surfboard-toned spine gradients (blue / teal family).
   private static readonly PALETTE = [
-    ['#0e7490', '#0b5563'],
-    ['#e2603b', '#b8442a'],
-    ['#2f7a55', '#1f5a3d'],
-    ['#5b6bb5', '#3c4a8f'],
-    ['#b7791f', '#8a5a12'],
-    ['#8a4d9e', '#653877'],
+    ['#0e44e1', '#0d33b8'], // royal blue
+    ['#0aa39a', '#077a73'], // mint teal
+    ['#3b82f6', '#1d4ed8'], // sky blue
+    ['#6366f1', '#4338ca'], // indigo
+    ['#0891b2', '#0e7490'], // cyan
+    ['#5b6bb5', '#3c4a8f'], // slate blue
   ];
 
   get initials(): string {

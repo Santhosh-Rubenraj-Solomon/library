@@ -3,6 +3,7 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import { ApiService } from '../../core/api.service';
+import { AuthService } from '../../core/auth.service';
 import { NotificationService } from '../../core/notification.service';
 import { Book, BookInput, Lend, User } from '../../models';
 
@@ -22,7 +23,7 @@ type Tab = 'books' | 'users' | 'lending';
         </div>
         <div class="tabs">
           <button [class.active]="tab() === 'books'" (click)="switch('books')">Books</button>
-          <button [class.active]="tab() === 'users'" (click)="switch('users')">Users</button>
+          <button [class.active]="tab() === 'users'" (click)="switch('users')">Members</button>
           <button [class.active]="tab() === 'lending'" (click)="switch('lending')">Lending</button>
         </div>
       </div>
@@ -112,25 +113,54 @@ type Tab = 'books' | 'users' | 'lending';
 
       <!-- ========================================================= USERS -->
       @if (tab() === 'users') {
+        <div class="row list-head" style="margin-bottom: 12px;">
+          <div>
+            <h2>Members</h2>
+            <p class="muted sub" style="margin: 2px 0 0; font-size: 0.88rem;">
+              Promote a member to admin to let them manage the catalog and other admins.
+            </p>
+          </div>
+          <span class="spacer"></span>
+          <button class="btn ghost sm" (click)="loadUsers()" [disabled]="loading()">Refresh</button>
+        </div>
         @if (loading()) {
           <div class="state"><span class="spinner"></span></div>
         } @else if (users().length === 0) {
-          <div class="state card pad"><div class="glyph">👤</div><h3>No users registered</h3></div>
+          <div class="state card pad"><div class="glyph">👤</div><h3>No members registered</h3></div>
         } @else {
           <div class="table-wrap">
             <table class="data-table">
               <thead>
-                <tr><th>Email</th><th>Role</th><th>Visits</th><th>Joined</th></tr>
+                <tr><th>Email</th><th>Role</th><th>Visits</th><th>Joined</th><th></th></tr>
               </thead>
               <tbody>
                 @for (user of users(); track user.userId) {
                   <tr>
-                    <td>{{ user.mailId }}</td>
+                    <td>
+                      {{ user.mailId }}
+                      @if (user.mailId === auth.user()?.mailId) { <span class="badge">you</span> }
+                    </td>
                     <td>
                       <span class="badge" [class.role]="user.role === 'admin'">{{ user.role }}</span>
                     </td>
                     <td class="mono">{{ user.visitCount ?? 0 }}</td>
                     <td class="mono">{{ user.createdAt | date: 'mediumDate' }}</td>
+                    <td>
+                      @if (user.role === 'admin') {
+                        <button
+                          class="btn ghost sm"
+                          (click)="setRole(user, 'user')"
+                          [disabled]="busy() === user.mailId || user.mailId === SUPER || user.mailId === auth.user()?.mailId"
+                          [title]="user.mailId === SUPER ? 'The primary admin cannot be demoted' : ''"
+                        >
+                          {{ busy() === user.mailId ? '…' : 'Remove admin' }}
+                        </button>
+                      } @else {
+                        <button class="btn sm" (click)="setRole(user, 'admin')" [disabled]="busy() === user.mailId">
+                          {{ busy() === user.mailId ? '…' : 'Make admin' }}
+                        </button>
+                      }
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -215,6 +245,11 @@ type Tab = 'books' | 'users' | 'lending';
 export class AdminComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly notify = inject(NotificationService);
+  readonly auth = inject(AuthService);
+
+  /** The primary admin — protected from demotion in the UI and the API. */
+  readonly SUPER = 'santhoshrubenc@gmail.com';
+  readonly busy = signal<string | null>(null);
 
   readonly tab = signal<Tab>('books');
   readonly loading = signal(false);
@@ -327,7 +362,28 @@ export class AdminComponent implements OnInit {
       error: () => {
         this.users.set([]);
         this.loading.set(false);
-        this.notify.error('Could not load users.');
+        this.notify.error('Could not load members.');
+      },
+    });
+  }
+
+  setRole(user: User, role: 'admin' | 'user'): void {
+    this.busy.set(user.mailId);
+    this.api.setRole(user.mailId, role).subscribe({
+      next: (res) => {
+        this.busy.set(null);
+        if (res.status === 'SUCCESS') {
+          this.notify.success(res.message || `${user.mailId} is now ${role}`);
+          this.users.update((list) =>
+            list.map((u) => (u.mailId === user.mailId ? { ...u, role } : u)),
+          );
+        } else {
+          this.notify.error(res.message || 'Could not change the role.');
+        }
+      },
+      error: (err) => {
+        this.busy.set(null);
+        this.notify.error(err?.error?.message || 'Could not change the role.');
       },
     });
   }

@@ -12,6 +12,9 @@ export const routes = [
                 "/returnbook",
                 "/getreturnedbooks",
                 "/getbooksreturnedbyuser",
+                "/reservebook",
+                "/myreservations",
+                "/cancelreservation",
 
         ];
 
@@ -27,6 +30,8 @@ export const adminRoutes = [
                         "/updatebook",
                         "/deletebook",
                         "/getusers",
+                        "/setrole",
+                        "/getreservations",
                         "/getlendedbooks",
                         "/getreturnedbooks",
                 ];

@@ -13,7 +13,7 @@ import { NotificationService } from '../../../core/notification.service';
     <div class="auth-shell">
       <section class="hero">
         <div class="hero-inner">
-          <p class="eyebrow">Surf Library</p>
+          <p class="eyebrow">Surfboard Library</p>
           <h1>Borrow good books.<br />Return the favour.</h1>
           <p class="lede">
             A small community library — browse the shelves, borrow what catches your

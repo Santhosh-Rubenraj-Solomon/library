@@ -4,7 +4,7 @@ import { DatePipe } from '@angular/common';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { NotificationService } from '../../core/notification.service';
-import { Lend } from '../../models';
+import { Lend, Reservation } from '../../models';
 
 @Component({
   selector: 'app-my-books',
@@ -40,6 +40,11 @@ import { Lend } from '../../models';
                   <div class="loan-main">
                     <h3>{{ lend.bookName }}</h3>
                     <p class="muted">Borrowed {{ lend.lendDate | date: 'mediumDate' }}</p>
+                    @if (lend.dueDate) {
+                      <p class="due" [class.overdue]="isOverdue(lend.dueDate)">
+                        {{ isOverdue(lend.dueDate) ? 'Overdue · was due ' : 'Due ' }}{{ lend.dueDate | date: 'mediumDate' }}
+                      </p>
+                    }
                   </div>
                   <button
                     class="btn accent sm"
@@ -48,6 +53,45 @@ import { Lend } from '../../models';
                   >
                     {{ returningName() === lend.bookName ? 'Returning…' : 'Return' }}
                   </button>
+                </div>
+              }
+            </div>
+          }
+        </section>
+
+        <!-- waitlist -->
+        <section class="block">
+          <h2 class="block-title">Your waitlist</h2>
+          @if (reservations().length === 0) {
+            <div class="state card pad">
+              <div class="glyph">⏳</div>
+              <h3>No reservations</h3>
+              <p>Reserve an on-loan book from the <a href="/catalog">catalog</a> to queue for it.</p>
+            </div>
+          } @else {
+            <div class="grid loans">
+              @for (r of reservations(); track r.reservationId) {
+                <div class="card pad loan">
+                  <div class="loan-main">
+                    <h3>{{ r.bookName }}</h3>
+                    @if (r.status === 'ready') {
+                      <p class="ready">Ready for you — borrow it now</p>
+                    } @else {
+                      <p class="muted">
+                        #{{ r.position }} in queue@if (r.dueDate) { · due back {{ r.dueDate | date: 'mediumDate' }} }
+                      </p>
+                    }
+                  </div>
+                  <div class="res-actions">
+                    @if (r.status === 'ready') {
+                      <button class="btn sm" [disabled]="busyRes() === r.bookName" (click)="borrowReserved(r.bookName)">
+                        {{ busyRes() === r.bookName ? '…' : 'Borrow' }}
+                      </button>
+                    }
+                    <button class="btn ghost sm" [disabled]="busyRes() === r.bookName" (click)="cancelRes(r.bookName)">
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               }
             </div>
@@ -97,6 +141,10 @@ import { Lend } from '../../models';
       .loan { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
       .loan-main h3 { font-size: 1.1rem; margin-bottom: 4px; }
       .loan-main p { margin: 0; font-size: 0.85rem; }
+      .due { margin-top: 4px !important; font-weight: 500; color: var(--sl-primary-strong); }
+      .due.overdue { color: var(--sl-danger); }
+      .ready { color: var(--sl-success); font-weight: 600; }
+      .res-actions { display: flex; gap: 8px; }
     `,
   ],
 })
@@ -108,7 +156,9 @@ export class MyBooksComponent implements OnInit {
   readonly loading = signal(true);
   readonly borrowed = signal<Lend[]>([]);
   readonly history = signal<Lend[]>([]);
+  readonly reservations = signal<Reservation[]>([]);
   readonly returningName = signal<string | null>(null);
+  readonly busyRes = signal<string | null>(null);
 
   ngOnInit(): void {
     this.reload();
@@ -116,7 +166,7 @@ export class MyBooksComponent implements OnInit {
 
   reload(): void {
     this.loading.set(true);
-    let pending = 2;
+    let pending = 3;
     const done = () => {
       pending -= 1;
       if (pending === 0) this.loading.set(false);
@@ -145,6 +195,17 @@ export class MyBooksComponent implements OnInit {
         done();
       },
     });
+
+    this.api.getMyReservations().subscribe({
+      next: (res) => {
+        this.reservations.set(res.status === 'SUCCESS' ? res.data ?? [] : []);
+        done();
+      },
+      error: () => {
+        this.reservations.set([]);
+        done();
+      },
+    });
   }
 
   returnBook(bookName: string): void {
@@ -162,6 +223,49 @@ export class MyBooksComponent implements OnInit {
       error: () => {
         this.returningName.set(null);
         this.notify.error('Could not return this book.');
+      },
+    });
+  }
+
+  isOverdue(dueDate: string | null | undefined): boolean {
+    return !!dueDate && new Date(dueDate).getTime() < Date.now();
+  }
+
+  cancelRes(bookName: string): void {
+    this.busyRes.set(bookName);
+    this.api.cancelReservation(bookName).subscribe({
+      next: (res) => {
+        this.busyRes.set(null);
+        if (res.status === 'SUCCESS') {
+          this.notify.success(`Left the queue for "${bookName}"`);
+          this.reload();
+        } else {
+          this.notify.error(res.message || 'Could not cancel the reservation.');
+        }
+      },
+      error: () => {
+        this.busyRes.set(null);
+        this.notify.error('Could not cancel the reservation.');
+      },
+    });
+  }
+
+  borrowReserved(bookName: string): void {
+    this.busyRes.set(bookName);
+    const today = new Date().toISOString().slice(0, 10);
+    this.api.lendBook(bookName, today).subscribe({
+      next: (res) => {
+        this.busyRes.set(null);
+        if (res.status === 'SUCCESS') {
+          this.notify.success(`Borrowed "${bookName}"`);
+          this.reload();
+        } else {
+          this.notify.error(res.message || 'Could not borrow this book.');
+        }
+      },
+      error: () => {
+        this.busyRes.set(null);
+        this.notify.error('Could not borrow this book.');
       },
     });
   }

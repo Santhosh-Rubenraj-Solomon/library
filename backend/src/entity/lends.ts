@@ -21,6 +21,9 @@ export class Lend {
   @Column({default: null, type: 'timestamp'})
   returnDate: Date;
 
+  @Column({default: null, type: 'timestamp'})
+  dueDate: Date;
+
   @Column({default:false})
   returned:boolean;
 }
