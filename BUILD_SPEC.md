@@ -11,7 +11,6 @@ skinned to the Figma "Surf Library" design.
 
 ## References
 
-- **Source repo (backend):** https://github.com/varunkannan41935/library — branch `library`
 - **Design (Figma):** https://www.figma.com/design/t50jxaPsMihkO9FZAFDwsP/Surf-Library — file "Surf Library".
 
 ## Task 0 — Preserve the existing API contract

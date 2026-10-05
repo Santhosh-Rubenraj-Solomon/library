@@ -8,10 +8,6 @@ here and what is **left** as a must-fix.
 
 - **Done:** this repo never commits a real `.env`. Only `backend/.env.example` is
   tracked, and `.env` is git-ignored.
-- **Left (in the source repo):** the upstream
-  [`varunkannan41935/library`](https://github.com/varunkannan41935/library) committed a
-  real `.env` (JWT secret + DB credentials) into history. Those secrets are burned —
-  **rotate them** and purge from history with `git filter-repo` or BFG.
 - Generate a strong JWT secret before running anything non-local:
   ```bash
   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"

@@ -7,9 +7,7 @@ A small full-stack community library:
 - **Frontend** — Angular 17 (standalone components), pointed at the load balancer
   so you can watch requests fan out across the replicas.
 
-Built from [`BUILD_SPEC.md`](./BUILD_SPEC.md). The original backend
-([varunkannan41935/library@library](https://github.com/varunkannan41935/library/tree/library))
-was fixed, containerised, and given a frontend.
+Built from [`BUILD_SPEC.md`](./BUILD_SPEC.md).
 
 ```
 ┌───────────┐      ┌───────────────┐      ┌────────── backend-1 ─┐
