@@ -6,7 +6,9 @@
     "build": "tsc -project tsconfig.json",
     "start": "node ./dist/src/server.js",
     "dev": "ts-node ./src/server.ts",
-    "seed:admin": "node ./dist/src/seed-admin.js"
+    "seed:admin": "node ./dist/src/seed-admin.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@fastify/cors": "^8.5.0",
@@ -22,6 +24,7 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^18.19.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "^2.1.9"
   }
 }
