@@ -50,12 +50,19 @@ describe('AuthService', () => {
     expect(create().isLoggedIn()).toBe(true);
   });
 
-  it('treats a malformed stored token as logged out (but leaves it in storage)', () => {
+  it('treats a malformed stored token as logged out and removes it from storage', () => {
     localStorage.setItem(TOKEN_KEY, 'garbage');
     const auth = create();
     expect(auth.isLoggedIn()).toBe(false);
-    // Note: the junk token is not cleaned up and the interceptor will still send it.
-    expect(auth.token).toBe('garbage');
+    expect(auth.token).toBeNull();
+    expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
+  });
+
+  it('removes a well-formed stored token that carries no user claim', () => {
+    localStorage.setItem(TOKEN_KEY, makeToken({ foo: 'bar' }));
+    const auth = create();
+    expect(auth.isLoggedIn()).toBe(false);
+    expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
   });
 
   it('decodes base64url payloads containing non-ASCII characters', () => {

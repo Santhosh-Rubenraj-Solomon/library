@@ -4,11 +4,18 @@ import { RequestGenericInterface } from "fastify";
 import * as dotenv from 'dotenv';
 import db from "../db";
 import * as jwt from "jsonwebtoken";
+import { nonBlankString, objectSchema } from "../validation";
 
 export default function userRoutes(fastify, options, done) {
 	const userRepo = fastify.db.userrecords;
 
-	fastify.post("/usersignin", async (req, res) => {
+	// mailId is required: an undefined where-condition is DROPPED by TypeORM 0.3,
+	// so findOne({ where: { mailId: undefined } }) would return the first stored
+	// user (possibly an admin) and mint a token for them.
+	fastify.post("/usersignin", {
+		schema: { body: objectSchema({ mailId: nonBlankString }, ["mailId"]) },
+		config: { validationMessage: "Invalid Input : Provide a mailId" },
+	}, async (req, res) => {
 
                console.log('Incoming Request object: ',req);
 
@@ -75,6 +82,12 @@ export default function userRoutes(fastify, options, done) {
 
                 }
 
+                return {
+                       status: 'SUCCESS',
+                       data: [],
+                       message: 'No Users found'
+                }
+
 
         });
 
@@ -82,7 +95,12 @@ export default function userRoutes(fastify, options, done) {
         // { data, user }, so the payload arrives as req.body.data. The primary
         // admin (SUPER_ADMIN) can never be demoted, so access can't be locked out.
         const SUPER_ADMIN = "santhoshrubenc@gmail.com";
-        fastify.post("/setrole", async (req, res) => {
+        fastify.post("/setrole", {
+                schema: {
+                        body: objectSchema({ mailId: nonBlankString, role: { type: "string", enum: ["admin", "user"] } }, ["mailId", "role"]),
+                },
+                config: { validationMessage: "mailId and role ('admin' | 'user') are required." },
+        }, async (req, res) => {
                 const mailId = req.body?.data?.mailId;
                 const role = req.body?.data?.role;
 

@@ -1,12 +1,16 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { getApp, auth, admin, alice, bob, carol } from "./helpers/app";
+import { getApp, auth, admin, alice, bob, carol, seedAdmin } from "./helpers/app";
 import { fakeDb } from "./helpers/fake-db";
 import { seedBook } from "./helpers/fixtures";
 
 let app: FastifyInstance;
 beforeAll(async () => {
   app = await getApp();
+});
+// Admin routes verify the caller's current role in the DB.
+beforeEach(async () => {
+  await seedAdmin();
 });
 
 type U = typeof alice;
@@ -40,6 +44,13 @@ describe("POST /reservebook", () => {
 
   it.each([undefined, "", "   "])("rejects a missing/blank book name (%j)", async (name) => {
     const res = await reserve(name);
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ status: "ERROR", data: null, message: "Provide a book to reserve." });
+  });
+
+  it("rejects a non-string book name with 400", async () => {
+    const res = await reserve(42);
+    expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({ status: "ERROR", data: null, message: "Provide a book to reserve." });
   });
 
@@ -160,14 +171,19 @@ describe("POST /cancelreservation", () => {
     expect(fakeDb.reservationrecords.rows[0].status).toBe("waiting");
   });
 
-  it("BUG: with no bookName it cancels an arbitrary active reservation of the caller", async () => {
-    // reservation-routes.ts:86 — where: { bookName: undefined, ... } drops the
-    // bookName condition in TypeORM 0.3, so the first active reservation is cancelled.
+  it.each([
+    ["missing", {}],
+    ["blank", { bookName: "  " }],
+    ["non-string", { bookName: 7 }],
+  ])("rejects a %s bookName with 400 and cancels nothing", async (_label, payload) => {
+    // An undefined where-condition is dropped by TypeORM 0.3, which used to
+    // cancel the caller's first active reservation for ANY book.
     onLoan();
     await reserve("Dune", alice);
-    const res = await cancel({}, alice);
-    expect(res.json().status).toBe("SUCCESS");
-    expect(fakeDb.reservationrecords.rows[0].status).toBe("cancelled");
+    const res = await cancel(payload, alice);
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ status: "ERROR", data: null, message: "Provide the book whose reservation you want to cancel." });
+    expect(fakeDb.reservationrecords.rows[0].status).toBe("waiting");
   });
 });
 
@@ -210,16 +226,27 @@ describe("end-to-end waitlist flow", () => {
     expect((await mine(bob)).json().data[0].status).toBe("ready");
   });
 
-  it("BUG: while a book is held 'ready' for someone, other users can neither borrow nor join the queue", async () => {
+  it("while a book is held 'ready' for someone, others cannot borrow it but CAN join the queue", async () => {
     // After a return the book is available=true but reserved for the 'ready' user.
-    // /lendbook rejects others (queue gate) and /reservebook rejects because
-    // `book.available` is true (reservation-routes.ts:34), so a third user is stuck.
     seedBook();
     await lend("Dune", carol);
     await reserve("Dune", alice);
     await ret("Dune", carol);
 
     expect((await lend("Dune", bob)).json().message).toBe("Dune is reserved for the next person in the queue.");
-    expect((await reserve("Dune", bob)).json().message).toBe("Dune is available now — borrow it directly.");
+    const res = await reserve("Dune", bob);
+    expect(res.json()).toMatchObject({
+      status: "SUCCESS",
+      data: { bookName: "Dune", position: 2, status: "waiting", dueDate: null },
+      message: "Reserved — you're #2 in the queue for Dune.",
+    });
+
+    // The held-for user is told to just borrow it; they can, and bob moves up.
+    expect((await reserve("Dune", alice)).json().message).toBe("Dune is available now — borrow it directly.");
+    expect((await lend("Dune", alice)).json().status).toBe("SUCCESS");
+    expect((await mine(bob)).json().data[0]).toMatchObject({ position: 1, status: "waiting" });
+    await ret("Dune", alice);
+    expect((await mine(bob)).json().data[0].status).toBe("ready");
+    expect((await lend("Dune", bob)).json().status).toBe("SUCCESS");
   });
 });

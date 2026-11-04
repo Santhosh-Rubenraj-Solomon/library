@@ -1,5 +1,11 @@
 import { In } from "typeorm";
 import db from "../db";
+import { objectSchema } from "../validation";
+
+// bookName must be a string; blank names are rejected by the handlers with
+// their own messages. (A missing bookName must never reach TypeORM: an
+// undefined where-condition is dropped, matching an arbitrary row.)
+const bookNameBody = objectSchema({ bookName: { type: "string" } });
 
 /**
  * Waitlist for on-loan books. Bodies arrive wrapped as { data, user } by the
@@ -23,15 +29,28 @@ export default function reservationRoutes(fastify, options, done) {
   };
 
   // Join the queue for a book that's on loan.
-  fastify.post("/reservebook", async (req, res) => {
+  fastify.post("/reservebook", {
+    schema: { body: bookNameBody },
+    config: { validationMessage: "Provide a book to reserve." },
+  }, async (req, res) => {
     try {
       const bookName: string = req.body?.data?.bookName;
       const user = req.body.user;
-      if (!bookName || !bookName.trim()) throw new Error("Provide a book to reserve.");
+      if (!bookName || !bookName.trim()) {
+        return res.code(400).send({ status: "ERROR", data: null, message: "Provide a book to reserve." });
+      }
 
       const book = await libRepo.findOne({ where: { bookName } });
       if (!book) throw new Error(`The book ${bookName} is not in the library.`);
-      if (book.available) throw new Error(`${bookName} is available now — borrow it directly.`);
+      if (book.available) {
+        // A returned book stays available=true while it is held ("ready") for
+        // the next person in the queue. Only refuse when nobody else holds it;
+        // otherwise others may still join the queue behind the holder.
+        const held = await resRepo.findOne({ where: { bookName, status: "ready" } });
+        if (!held || held.userId === user.userId) {
+          throw new Error(`${bookName} is available now — borrow it directly.`);
+        }
+      }
 
       const holding = await lendRepo.findOne({
         where: { bookName, userId: user.userId, returned: false },
@@ -79,10 +98,16 @@ export default function reservationRoutes(fastify, options, done) {
     return { status: "SUCCESS", data, message: "Your reservations." };
   });
 
-  fastify.post("/cancelreservation", async (req, res) => {
+  fastify.post("/cancelreservation", {
+    schema: { body: bookNameBody },
+    config: { validationMessage: "Provide the book whose reservation you want to cancel." },
+  }, async (req, res) => {
     try {
       const bookName: string = req.body?.data?.bookName;
       const user = req.body.user;
+      if (!bookName || !bookName.trim()) {
+        return res.code(400).send({ status: "ERROR", data: null, message: "Provide the book whose reservation you want to cancel." });
+      }
       const mine = await resRepo.findOne({
         where: { bookName, userId: user.userId, status: In(["waiting", "ready"]) },
       });

@@ -71,9 +71,9 @@ export class ApiService {
     return this.http.get<ApiResponse<Lend[]>>(`${this.base}/getbooksreturnedbyuser`);
   }
 
-  /** GET /lendedbooksbyuser — reads user from token (Task 0 fix). */
-  getLendedBooksByUser(): Observable<ApiResponse<Lend>> {
-    return this.http.get<ApiResponse<Lend>>(`${this.base}/lendedbooksbyuser`);
+  /** GET /lendedbooksbyuser — reads user from token; data is every active loan. */
+  getLendedBooksByUser(): Observable<ApiResponse<Lend[]>> {
+    return this.http.get<ApiResponse<Lend[]>>(`${this.base}/lendedbooksbyuser`);
   }
 
   // --- admin ----------------------------------------------------------------

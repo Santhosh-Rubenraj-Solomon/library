@@ -61,12 +61,13 @@ export class AuthService {
     const token = typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
     if (!token) return null;
     const payload = this.decode(token);
-    // Drop expired tokens so the UI doesn't pretend to be logged in.
-    if (payload?.exp && payload.exp * 1000 < Date.now()) {
+    // Drop malformed, user-less or expired tokens so the UI doesn't pretend to
+    // be logged in and the interceptor doesn't keep sending junk.
+    if (!payload?.user || (payload.exp && payload.exp * 1000 < Date.now())) {
       localStorage.removeItem(TOKEN_KEY);
       return null;
     }
-    return payload?.user ?? null;
+    return payload.user;
   }
 
   private decode(token: string): JwtPayload | null {

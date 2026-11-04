@@ -356,7 +356,8 @@ export class AdminComponent implements OnInit {
     this.loading.set(true);
     this.api.getUsers().subscribe({
       next: (res) => {
-        this.users.set(res.status === 'SUCCESS' ? res.data ?? [] : []);
+        // Be defensive: an empty/invalid body arrives as null.
+        this.users.set(res?.status === 'SUCCESS' && Array.isArray(res.data) ? res.data : []);
         this.loading.set(false);
       },
       error: () => {

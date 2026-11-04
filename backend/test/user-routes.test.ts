@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import * as jwt from "jsonwebtoken";
 import type { FastifyInstance } from "fastify";
-import { getApp, auth, admin, alice } from "./helpers/app";
+import { getApp, auth, admin, alice, seedAdmin } from "./helpers/app";
 import { fakeDb } from "./helpers/fake-db";
 
 let app: FastifyInstance;
@@ -54,14 +54,21 @@ describe("POST /usersignin", () => {
     expect(res.json().status).toBe("SUCCESS");
   });
 
-  it("BUG: sign-in with no mailId returns a token for the FIRST stored user (can be the admin)", async () => {
-    // user-routes.ts:34 — findOne({ where: { mailId: undefined } }) has no condition
-    // in TypeORM 0.3, so it returns an arbitrary/first row. There is no input
-    // validation, so an empty body impersonates an existing account.
+  it.each([
+    ["an empty body", {}],
+    ["no body at all", undefined],
+    ["a blank mailId", { mailId: "   " }],
+    ["a non-string mailId", { mailId: 42 }],
+    ["an object mailId", { mailId: { $ne: "" } }],
+  ])("rejects sign-in with %s (400, no token, never matches a stored user)", async (_label, payload) => {
+    // An undefined where-condition is dropped by TypeORM 0.3, which used to
+    // return the FIRST stored user (possibly the admin) for an empty body.
     fakeDb.userrecords.seed({ userId: "u-admin", mailId: admin.mailId, role: "admin" });
-    const res = await signin({});
-    expect(res.json().status).toBe("SUCCESS");
-    expect(decode(res.json().data).user).toMatchObject({ mailId: admin.mailId, role: "admin" });
+    const res = await signin(payload);
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ status: "ERROR", data: null, message: "Invalid Input : Provide a mailId" });
+    expect(fakeDb.userrecords.rows).toHaveLength(1);
+    expect(fakeDb.userrecords.rows[0].visitCount).toBe(0);
   });
 
   it("returns 500 when the JWT secret is not configured", async () => {
@@ -78,26 +85,37 @@ describe("POST /usersignin", () => {
 
 describe("GET /getusers (admin)", () => {
   it("lists all users", async () => {
+    await seedAdmin();
     fakeDb.userrecords.seed({ mailId: "a@x.io", role: "user" });
     fakeDb.userrecords.seed({ mailId: "b@x.io", role: "admin" });
     const res = await app.inject({ method: "GET", url: "/getusers", headers: auth(admin) });
     const body = res.json();
     expect(body.status).toBe("SUCCESS");
-    expect(body.data.map((u: any) => u.mailId)).toEqual(["a@x.io", "b@x.io"]);
+    expect(body.data.map((u: any) => u.mailId)).toEqual([admin.mailId, "a@x.io", "b@x.io"]);
     expect(body.message).toBe("The Users fetched Successfully");
   });
 
-  it("BUG: with no users the handler returns undefined → empty 200 body instead of the envelope", async () => {
-    // user-routes.ts:69 — no else branch, so the response is not { status, data, message }.
-    const res = await app.inject({ method: "GET", url: "/getusers", headers: auth(admin) });
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toBe("");
+  it("returns the standard envelope with an empty list when there are no users", async () => {
+    // The admin check reads the DB, so stub an empty table for the listing call only.
+    const realFind = fakeDb.userrecords.find.bind(fakeDb.userrecords);
+    await seedAdmin();
+    fakeDb.userrecords.find = async () => [];
+    try {
+      const res = await app.inject({ method: "GET", url: "/getusers", headers: auth(admin) });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ status: "SUCCESS", data: [], message: "No Users found" });
+    } finally {
+      fakeDb.userrecords.find = realFind;
+    }
   });
 });
 
 describe("POST /setrole (admin)", () => {
   const setrole = (payload: any, user = admin) =>
     app.inject({ method: "POST", url: "/setrole", headers: auth(user), payload });
+  beforeEach(async () => {
+    await seedAdmin();
+  });
 
   it("rejects non-admins with 403 at the gate", async () => {
     const res = await setrole({ mailId: "a@x.io", role: "admin" }, alice);
@@ -136,7 +154,7 @@ describe("POST /setrole (admin)", () => {
       data: { mailId: "promote@x.io", role: "admin" },
       message: "promote@x.io is now admin.",
     });
-    expect(fakeDb.userrecords.rows[0].role).toBe("admin");
+    expect(fakeDb.userrecords.rows.find((u) => u.mailId === "promote@x.io")!.role).toBe("admin");
   });
 
   it("demotes an admin to user", async () => {
@@ -151,12 +169,19 @@ describe("POST /setrole (admin)", () => {
     expect(res.statusCode).toBe(200);
   });
 
-  it("role changes do not affect already-issued tokens (role is read from the JWT, not the DB)", async () => {
-    // Design limitation: a demoted admin keeps admin access until their token expires (24h).
+  it("a demoted admin loses admin access immediately, even with an unexpired admin token", async () => {
     const demoted = { userId: "u-d", mailId: "demoted@x.io", role: "admin" };
     fakeDb.userrecords.seed({ ...demoted });
+    expect((await app.inject({ method: "GET", url: "/getusers", headers: auth(demoted) })).statusCode).toBe(200);
     await setrole({ mailId: demoted.mailId, role: "user" });
     const res = await app.inject({ method: "GET", url: "/getusers", headers: auth(demoted) });
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ statusCode: 403, error: "Forbidden", message: "Admin access required" });
+  });
+
+  it("an admin-role token for a user that no longer exists is rejected on admin routes", async () => {
+    const ghost = { userId: "u-ghost", mailId: "ghost-admin@x.io", role: "admin" };
+    const res = await app.inject({ method: "GET", url: "/getusers", headers: auth(ghost) });
+    expect(res.statusCode).toBe(403);
   });
 });

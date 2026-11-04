@@ -4,6 +4,7 @@ import { Lend } from "../entity/lends";
 import { Users } from "../entity/users";
 import { RequestGenericInterface } from "fastify";
 import db from "../db";
+import { nonBlankString, objectSchema } from "../validation";
 
 export default function lendRoutes(fastify, options, done) {
 	const libRepo = fastify.db.library;
@@ -12,7 +13,12 @@ export default function lendRoutes(fastify, options, done) {
 	const resRepo = fastify.db.reservationrecords;
 
 
-	fastify.post("/lendbook", async (req, res) => {
+	fastify.post("/lendbook", {
+		schema: {
+			body: objectSchema({ bookName: nonBlankString, lendDate: nonBlankString }, ["bookName", "lendDate"]),
+		},
+		config: { validationMessage: "Invalid Input : Provide Required Input" },
+	}, async (req, res) => {
 		try {
 
 			const book = {
@@ -31,6 +37,12 @@ export default function lendRoutes(fastify, options, done) {
 					throw new Error("Invalid Input : Provide Required Input");
 				}
 			});
+
+			// Reject an unparseable lendDate before touching the database
+			// (it would otherwise produce an Invalid Date dueDate).
+			if (Number.isNaN(new Date(book.lendDate).getTime())) {
+				return res.code(400).send({ status: "ERROR", data: null, message: "Invalid Input : lendDate must be a valid date" });
+			}
 
 			const findBook = await libRepo.findOne({where: { bookName: book.bookName },});
 			console.log("To Find The Book Is In The Library --->",findBook);
@@ -110,10 +122,10 @@ export default function lendRoutes(fastify, options, done) {
 			const userId = req.body.user.userId;
 			console.log("UserId from token ->",userId);
 
-			const booksLentByUser = await lendRepo.findOne({where: { userId, returned: false }});
+			const booksLentByUser = await lendRepo.find({where: { userId, returned: false }});
 			console.log("Total Books lend by particular user ->",booksLentByUser);
 
-			if (booksLentByUser != null) {
+			if (booksLentByUser.length != 0) {
 					return {
 						status: "SUCCESS",
 						data: booksLentByUser,

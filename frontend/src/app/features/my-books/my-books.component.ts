@@ -174,9 +174,10 @@ export class MyBooksComponent implements OnInit {
 
     this.api.getLendedBooksByUser().subscribe({
       next: (res) => {
-        // Endpoint uses findOne → single record (or ERROR when none).
-        const data = res.status === 'SUCCESS' ? res.data : null;
-        this.borrowed.set(data ? (Array.isArray(data) ? data : [data]) : []);
+        // Endpoint returns every active loan (or ERROR when none). A single
+        // object is still tolerated for older backends.
+        const data: unknown = res?.status === 'SUCCESS' ? res.data : null;
+        this.borrowed.set(data ? (Array.isArray(data) ? data : [data as Lend]) : []);
         done();
       },
       error: () => {

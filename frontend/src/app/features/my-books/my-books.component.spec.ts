@@ -59,7 +59,14 @@ describe('MyBooksComponent', () => {
     expect(cmp.loading()).toBe(false);
   });
 
-  it('wraps the single-object /lendedbooksbyuser response in an array', () => {
+  it('shows every active loan returned by /lendedbooksbyuser', () => {
+    flushAll(ok([lend('Dune'), lend('Emma')]), err(), ok([]));
+    expect(cmp.borrowed()).toEqual([lend('Dune'), lend('Emma')]);
+    expect(fixture.nativeElement.textContent).toContain('Dune');
+    expect(fixture.nativeElement.textContent).toContain('Emma');
+  });
+
+  it('still tolerates a single-object /lendedbooksbyuser response (older backend)', () => {
     flushAll(ok(lend('Dune')), err(), ok([]));
     expect(cmp.borrowed()).toEqual([lend('Dune')]);
     expect(fixture.nativeElement.textContent).toContain('Dune');

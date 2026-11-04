@@ -28,3 +28,12 @@ export function tokenFor(user: Partial<TestUser> | undefined, opts: jwt.SignOpti
 export function auth(user: Partial<TestUser>) {
   return { authorization: `Bearer ${tokenFor(user)}` };
 }
+
+/**
+ * Admin routes check the CURRENT role in the database (not just the JWT), so
+ * the admin fixture must exist in the user table for admin requests to pass.
+ */
+export async function seedAdmin(user: TestUser = admin) {
+  const { fakeDb } = await import("./fake-db");
+  return fakeDb.userrecords.seed({ ...user });
+}
