@@ -4,6 +4,7 @@ import { Users } from "../entity/users";
 import { Library } from "../entity/books";
 import { RequestGenericInterface } from "fastify";
 import db from "../db";
+import { nonBlankString, objectSchema } from "../validation";
 
 export default function returnRoutes(fastify, options, done) {
 	const lendRepo = fastify.db.lendrecords;
@@ -11,7 +12,10 @@ export default function returnRoutes(fastify, options, done) {
 	const userRepo = fastify.db.userrecords;
 	const resRepo = fastify.db.reservationrecords;
 
-	fastify.post("/returnbook", async (req, res) => {
+	fastify.post("/returnbook", {
+		schema: { body: objectSchema({ bookName: nonBlankString }, ["bookName"]) },
+		config: { validationMessage: "Invalid Input : Provide Required Input" },
+	}, async (req, res) => {
 		
 		console.log('Incoming Request object: ',req);
 
@@ -63,10 +67,13 @@ export default function returnRoutes(fastify, options, done) {
 
                         }
 
-                        if (lendInfo == null){
+                        // Only say "already returned" when this user really borrowed
+                        // (and returned) this book; otherwise it was never borrowed.
+                        const returnedBefore = findUser.some((l: any) => l.bookName === bookName && l.returned === true);
+                        if (returnedBefore){
                               throw new Error(`${user.mailId} Returned The Book ${bookName}`)
- 
                         }
+                        throw new Error(`${user.mailId} Has Not Borrowed The Book ${bookName}`)
 
 		} catch (e) {
 			return {

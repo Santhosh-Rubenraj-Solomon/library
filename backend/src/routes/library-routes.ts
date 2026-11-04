@@ -2,11 +2,21 @@ import { getRepository } from "typeorm";
 import {ILike} from "typeorm";
 import { Library } from "../entity/books";
 import db from "../db";
+import { escapeLike, nonBlankString, objectSchema, optionalString } from "../validation";
+
+const BOOK_FIELDS = ["bookName", "authorName", "language", "genre", "donatedBy"];
 
 export default function libraryRoutes(fastify, options, done) {
 	const libRepo = fastify.db.library;
 
-	fastify.post("/postnewbook", async (req, res) => {
+	// All five fields are required non-blank strings (non-strings → 400 instead
+	// of a "trim is not a function" crash).
+	fastify.post("/postnewbook", {
+		schema: {
+			body: objectSchema(Object.fromEntries(BOOK_FIELDS.map((f) => [f, nonBlankString])), BOOK_FIELDS),
+		},
+		config: { validationMessage: (field: string) => `Invalid Input : Provide Required input for ${field}` },
+	}, async (req, res) => {
                 
                 console.log('Incoming Request object: ',req);
 		try {
@@ -28,7 +38,7 @@ export default function libraryRoutes(fastify, options, done) {
   
                         });
 
-			const getBook = await libRepo.findOne({where: { bookName: ILike(newBook.bookName)}});
+			const getBook = await libRepo.findOne({where: { bookName: ILike(escapeLike(newBook.bookName))}});
 			console.log("To Check Whether The Book Is Already In The library: ",getBook);
 
 			if (getBook == null) {
@@ -96,7 +106,7 @@ export default function libraryRoutes(fastify, options, done) {
 			};
                         console.log(`Input's For Updation : `, newBook);
 
-			const findBook = await libRepo.findOne({where: { bookName: ILike( bookName) },});
+			const findBook = await libRepo.findOne({where: { bookName: ILike(escapeLike(bookName)) },});
 			console.log("To find the book For Updation is in the library ->",findBook);
 
 			if (findBook == null) {
@@ -171,7 +181,13 @@ export default function libraryRoutes(fastify, options, done) {
 		}
 	});
 
-	fastify.get("/getbookbyquery", async (req, res) => {
+	// Filters must be plain strings (a repeated ?genre=a&genre=b is rejected).
+	fastify.get("/getbookbyquery", {
+		schema: {
+			querystring: objectSchema(Object.fromEntries(BOOK_FIELDS.map((f) => [f, optionalString]))),
+		},
+		config: { validationMessage: "Invalid Input : Provide the Required Inputs" },
+	}, async (req, res) => {
 		
 		console.log('Incoming Request object: ',req);
 

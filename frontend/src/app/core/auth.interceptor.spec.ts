@@ -54,12 +54,23 @@ describe('authInterceptor', () => {
     req.flush({});
   });
 
-  it('quirk: public-path matching is a substring test on the full URL', () => {
-    // A protected URL that merely *contains* a public path segment loses its token.
+  it.each(['/getallbooks-archive', '/admin/usersignin-log', '/getbookbyquery?next=/healthcheck'])(
+    'public-path matching is exact: protected %s keeps its token',
+    (path) => {
+      const token = loginAs(userClaim);
+      setup();
+      http.get(`${API}${path}`).subscribe();
+      const req = ctrl.expectOne(`${API}${path}`);
+      expect(req.request.headers.get('Authorization')).toBe(`Bearer ${token}`);
+      req.flush({});
+    },
+  );
+
+  it('treats a public path with a query string as public', () => {
     loginAs(userClaim);
     setup();
-    http.get(`${API}/getallbooks-archive`).subscribe();
-    const req = ctrl.expectOne(`${API}/getallbooks-archive`);
+    http.get(`${API}/getallbooks?page=2`).subscribe();
+    const req = ctrl.expectOne(`${API}/getallbooks?page=2`);
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush({});
   });

@@ -1,12 +1,16 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { getApp, auth, admin, alice, bob, tokenFor } from "./helpers/app";
+import { getApp, auth, admin, alice, bob, tokenFor, seedAdmin } from "./helpers/app";
 import { fakeDb } from "./helpers/fake-db";
 import { seedBook } from "./helpers/fixtures";
 
 let app: FastifyInstance;
 beforeAll(async () => {
   app = await getApp();
+});
+// Admin routes verify the caller's current role in the DB.
+beforeEach(async () => {
+  await seedAdmin();
 });
 
 const lend = (payload: any, user = alice) => app.inject({ method: "POST", url: "/lendbook", headers: auth(user), payload });
@@ -50,11 +54,12 @@ describe("POST /lendbook", () => {
   ])("rejects %s", async (_label, payload) => {
     seedBook();
     const res = await lend(payload);
+    expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({ status: "ERROR", data: null, message: "Invalid Input : Provide Required Input" });
     expect(fakeDb.lendrecords.rows).toHaveLength(0);
   });
 
-  it("rejects when the token lacks userId/mailId", async () => {
+  it("rejects with 401 when the token lacks userId (auth gate)", async () => {
     seedBook();
     const res = await app.inject({
       method: "POST",
@@ -62,7 +67,20 @@ describe("POST /lendbook", () => {
       headers: { authorization: `Bearer ${tokenFor({ role: "user" })}` },
       payload: { bookName: "Dune", lendDate: "2025-01-01" },
     });
+    expect(res.statusCode).toBe(401);
+    expect(fakeDb.lendrecords.rows).toHaveLength(0);
+  });
+
+  it("rejects when the token lacks mailId", async () => {
+    seedBook();
+    const res = await app.inject({
+      method: "POST",
+      url: "/lendbook",
+      headers: { authorization: `Bearer ${tokenFor({ userId: "u-x", role: "user" })}` },
+      payload: { bookName: "Dune", lendDate: "2025-01-01" },
+    });
     expect(res.json().message).toBe("Invalid Input : Provide Required Input");
+    expect(fakeDb.lendrecords.rows).toHaveLength(0);
   });
 
   it("returns ERROR for a book that is not in the library", async () => {
@@ -116,10 +134,20 @@ describe("POST /lendbook", () => {
     expect((await lend({ bookName: "Emma", lendDate: "2025-01-01" })).json().status).toBe("SUCCESS");
   });
 
-  // The handler only checks typeof === "string"; an unparseable date yields an
-  // Invalid Date dueDate that would be rejected by Postgres (caught → ERROR).
-  // That depends on the real DB driver, so it is not asserted against the fake.
-  it.todo("rejects an unparseable lendDate before hitting the database");
+  it.each(["not-a-date", "2025-13-45"])("rejects an unparseable lendDate (%s) before hitting the database", async (lendDate) => {
+    const book = seedBook();
+    const res = await lend({ bookName: "Dune", lendDate });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ status: "ERROR", data: null, message: "Invalid Input : lendDate must be a valid date" });
+    expect(fakeDb.lendrecords.rows).toHaveLength(0);
+    expect(book.available).toBe(true);
+  });
+
+  it("accepts a full ISO timestamp as lendDate", async () => {
+    seedBook();
+    const res = await lend({ bookName: "Dune", lendDate: "2025-01-01T10:00:00.000Z" });
+    expect(res.json().status).toBe("SUCCESS");
+  });
 });
 
 describe("GET /getlendedbooks (admin)", () => {
@@ -140,12 +168,13 @@ describe("GET /getlendedbooks (admin)", () => {
 describe("GET /lendedbooksbyuser", () => {
   const get = (user = alice) => app.inject({ method: "GET", url: "/lendedbooksbyuser", headers: auth(user) });
 
-  it("reads the user from the token (no GET body needed) and returns their active loan", async () => {
+  it("reads the user from the token (no GET body needed) and returns their active loans", async () => {
     fakeDb.lendrecords.seed({ userId: alice.userId, bookName: "A", mailId: alice.mailId, lendDate: new Date() });
     fakeDb.lendrecords.seed({ userId: bob.userId, bookName: "B", mailId: bob.mailId, lendDate: new Date() });
     const res = await get();
     expect(res.json().status).toBe("SUCCESS");
-    expect(res.json().data).toMatchObject({ bookName: "A", userId: alice.userId });
+    expect(res.json().data).toHaveLength(1);
+    expect(res.json().data[0]).toMatchObject({ bookName: "A", userId: alice.userId });
   });
 
   it("returns ERROR when the user has no active loans", async () => {
@@ -158,13 +187,12 @@ describe("GET /lendedbooksbyuser", () => {
     });
   });
 
-  it("BUG: returns only ONE loan even when the user holds several books", async () => {
-    // lend-routes.ts:113 uses findOne instead of find, so "My books" shows a
-    // single borrowed book (the frontend wraps it in an array to cope).
+  it("returns ALL active loans when the user holds several books (returned ones excluded)", async () => {
     fakeDb.lendrecords.seed({ userId: alice.userId, bookName: "A", mailId: alice.mailId, lendDate: new Date() });
     fakeDb.lendrecords.seed({ userId: alice.userId, bookName: "B", mailId: alice.mailId, lendDate: new Date() });
+    fakeDb.lendrecords.seed({ userId: alice.userId, bookName: "C", mailId: alice.mailId, lendDate: new Date(), returned: true });
     const res = await get();
-    expect(Array.isArray(res.json().data)).toBe(false);
-    expect(res.json().data.bookName).toBe("A");
+    expect(Array.isArray(res.json().data)).toBe(true);
+    expect(res.json().data.map((l: any) => l.bookName)).toEqual(["A", "B"]);
   });
 });

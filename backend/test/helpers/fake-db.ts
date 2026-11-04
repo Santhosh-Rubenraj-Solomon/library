@@ -5,7 +5,8 @@
  *  - `where` keys whose value is `undefined` / `null` are IGNORED (no condition),
  *    exactly like TypeORM 0.3 — this matters for several documented bugs.
  *  - FindOperators `In(...)` and `ILike(...)` are supported; ILike follows SQL
- *    LIKE rules (`%` = any run, `_` = any single char), case-insensitive.
+ *    LIKE rules (`%` = any run, `_` = any single char, `\` escapes the next
+ *    char — Postgres' default escape), case-insensitive.
  *  - `order: { col: "ASC" | "DESC" }`.
  *  - `update(idOrCriteria, partial)` skips `undefined` values.
  *  - `save()` fills uuid primary keys, column defaults and CreateDateColumns.
@@ -48,8 +49,17 @@ let tick = Date.UTC(2025, 0, 1);
 const nextCreatedAt = () => new Date((tick += 1000));
 
 function likeToRegex(pattern: string): RegExp {
-  const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp("^" + escaped.replace(/%/g, ".*").replace(/_/g, ".") + "$", "i");
+  // Postgres LIKE: "%" = any run, "_" = any single char, "\\" escapes the next char.
+  const reEscape = (c: string) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let out = "";
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i];
+    if (c === "\\" && i + 1 < pattern.length) out += reEscape(pattern[++i]);
+    else if (c === "%") out += ".*";
+    else if (c === "_") out += ".";
+    else out += reEscape(c);
+  }
+  return new RegExp("^" + out + "$", "is");
 }
 
 function matchValue(actual: any, expected: any): boolean {

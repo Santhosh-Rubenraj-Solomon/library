@@ -1,12 +1,16 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { getApp, auth, admin, alice, bob, carol } from "./helpers/app";
+import { getApp, auth, admin, alice, bob, carol, seedAdmin } from "./helpers/app";
 import { fakeDb } from "./helpers/fake-db";
 import { seedBook } from "./helpers/fixtures";
 
 let app: FastifyInstance;
 beforeAll(async () => {
   app = await getApp();
+});
+// Admin routes verify the caller's current role in the DB.
+beforeEach(async () => {
+  await seedAdmin();
 });
 
 const ret = (payload: any, user = alice) => app.inject({ method: "POST", url: "/returnbook", headers: auth(user), payload });
@@ -56,13 +60,14 @@ describe("POST /returnbook", () => {
     ["blank", { bookName: "   " }],
   ])("rejects a %s bookName", async (_l, payload) => {
     const res = await ret(payload);
+    expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({ status: "ERROR", data: null, message: "Invalid Input : Provide Required Input" });
   });
 
-  it("non-string bookName yields a raw TypeError message", async () => {
-    const res = await ret({ bookName: 123 });
-    expect(res.json().status).toBe("ERROR");
-    expect(res.json().message).toMatch(/trim is not a function/);
+  it.each([123, ["Dune"], { name: "Dune" }])("rejects a non-string bookName (%j) with 400", async (bookName) => {
+    const res = await ret({ bookName });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ status: "ERROR", data: null, message: "Invalid Input : Provide Required Input" });
   });
 
   it("returns ERROR for an unknown book", async () => {
@@ -93,13 +98,12 @@ describe("POST /returnbook", () => {
     expect(second.json()).toEqual({ status: "ERROR", data: null, message: `${alice.mailId} Returned The Book Dune` });
   });
 
-  it("misleading message: a user who borrowed OTHER books is told they 'Returned' a book they never had", async () => {
-    // return-routes.ts:66 — any lendInfo==null case with prior loans reports "Returned The Book".
+  it("a user who borrowed OTHER books gets a clear error for a book they never borrowed", async () => {
     seedBook();
     seedBook({ bookName: "Emma" });
     seedLoan(alice, "Emma");
     const res = await ret({ bookName: "Dune" });
-    expect(res.json().message).toBe(`${alice.mailId} Returned The Book Dune`);
+    expect(res.json()).toEqual({ status: "ERROR", data: null, message: `${alice.mailId} Has Not Borrowed The Book Dune` });
   });
 });
 

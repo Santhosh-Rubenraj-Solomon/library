@@ -221,16 +221,21 @@ describe('AdminComponent', () => {
     expect(cmp.users()).toEqual([]);
   });
 
-  it('BUG: members tab throws when /getusers returns an empty body (backend sends nothing when there are no users)', () => {
-    // Backend user-routes.ts:69 returns undefined for an empty user list, so the
-    // response body is empty → HttpClient yields null and `res.status` throws in
-    // AdminComponent.loadUsers (admin.component.ts:359), leaving loading=true.
+  it('members tab copes with an empty (null) /getusers body: empty list, spinner clears', () => {
     flushBooks();
     cmp.switch('users');
     http.expectOne(`${API}/getusers`).flush(null);
-    // RxJS reports the error thrown inside `next` asynchronously (setTimeout).
-    expect(() => jest.runOnlyPendingTimers()).toThrow(/Cannot read properties of null \(reading 'status'\)/);
-    expect(cmp.loading()).toBe(true); // spinner never clears
+    expect(() => jest.runOnlyPendingTimers()).not.toThrow();
+    expect(cmp.users()).toEqual([]);
+    expect(cmp.loading()).toBe(false);
+  });
+
+  it('members tab shows an empty list for the standard empty envelope', () => {
+    flushBooks();
+    cmp.switch('users');
+    http.expectOne(`${API}/getusers`).flush({ status: 'SUCCESS', data: [], message: 'No Users found' });
+    expect(cmp.users()).toEqual([]);
+    expect(cmp.loading()).toBe(false);
   });
 
   it('lending tab loads lent + returned and stays loading until both settle', () => {

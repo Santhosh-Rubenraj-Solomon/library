@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import * as jwt from "jsonwebtoken";
 import type { FastifyInstance } from "fastify";
-import { getApp, tokenFor, auth, alice, admin } from "./helpers/app";
+import { getApp, tokenFor, auth, alice, admin, seedAdmin } from "./helpers/app";
 import { fakeDb } from "./helpers/fake-db";
 
 let app: FastifyInstance;
@@ -43,7 +43,7 @@ describe("server bootstrap", () => {
   });
 });
 
-describe("auth gate (preHandler)", () => {
+describe("auth gate (onRequest)", () => {
   it("lets public routes through without a token", async () => {
     const res = await app.inject({ method: "GET", url: "/getallbooks" });
     expect(res.statusCode).toBe(200);
@@ -107,12 +107,24 @@ describe("auth gate (preHandler)", () => {
     }
   });
 
-  it("returns 403 on admin routes when the token carries no user claim", async () => {
+  it("returns 401 on admin routes when the token carries no user claim", async () => {
     const res = await app.inject({ method: "GET", url: "/getusers", headers: { authorization: `Bearer ${tokenFor(undefined)}` } });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("returns 403 on admin routes for a user-role token even if the claim says admin but the DB says user", async () => {
+    fakeDb.userrecords.seed({ ...alice });
+    const res = await app.inject({ method: "GET", url: "/getusers", headers: auth({ ...alice, role: "admin" }) });
     expect(res.statusCode).toBe(403);
   });
 
+  it("checks auth before body validation: an unauthenticated invalid body gets 401, not 400", async () => {
+    const res = await app.inject({ method: "POST", url: "/lendbook", payload: { bookName: 42 } });
+    expect(res.statusCode).toBe(401);
+  });
+
   it("lets an admin token through to admin routes", async () => {
+    await seedAdmin();
     fakeDb.userrecords.seed({ mailId: "x@y.z", role: "user" });
     const res = await app.inject({ method: "GET", url: "/getusers", headers: auth(admin) });
     expect(res.statusCode).toBe(200);
@@ -149,9 +161,15 @@ describe("auth gate (preHandler)", () => {
     expect(authed.statusCode).toBe(404);
   });
 
-  it("returns 500 when a valid token without a `user` claim hits /myreservations (no guard on req.body.user)", async () => {
-    // Robustness gap: handler dereferences user.userId outside any try/catch.
+  it("returns 401 when a valid token without a `user` claim hits /myreservations", async () => {
     const res = await app.inject({ method: "GET", url: "/myreservations", headers: { authorization: `Bearer ${tokenFor(undefined)}` } });
-    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ statusCode: 401, error: "Unauthorized", message: "JWT token carries no valid user" });
+  });
+
+  it("returns 401 when the user claim has no userId (would otherwise drop the where-condition)", async () => {
+    fakeDb.lendrecords.seed({ userId: "u-bob", bookName: "B", mailId: "bob@example.com", lendDate: new Date() });
+    const res = await app.inject({ method: "GET", url: "/lendedbooksbyuser", headers: auth({ mailId: "x@y.z", role: "user" }) });
+    expect(res.statusCode).toBe(401);
   });
 });

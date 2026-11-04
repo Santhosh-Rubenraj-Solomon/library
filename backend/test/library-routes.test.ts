@@ -1,12 +1,16 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { getApp, auth, admin, alice } from "./helpers/app";
+import { getApp, auth, admin, alice, seedAdmin } from "./helpers/app";
 import { fakeDb } from "./helpers/fake-db";
 import { bookInput, seedBook } from "./helpers/fixtures";
 
 let app: FastifyInstance;
 beforeAll(async () => {
   app = await getApp();
+});
+// Admin routes verify the caller's current role in the DB.
+beforeEach(async () => {
+  await seedAdmin();
 });
 
 const post = (payload: any) => app.inject({ method: "POST", url: "/postnewbook", headers: auth(admin), payload });
@@ -45,18 +49,35 @@ describe("POST /postnewbook (admin)", () => {
     expect(fakeDb.library.rows).toHaveLength(1);
   });
 
-  it("non-string fields produce a raw TypeError message (no type validation)", async () => {
-    const res = await post(bookInput({ authorName: 42 }));
-    expect(res.json().status).toBe("ERROR");
-    expect(res.json().message).toMatch(/trim is not a function/);
+  it("answers missing/blank fields with HTTP 400", async () => {
+    const res = await post(bookInput({ genre: "" }));
+    expect(res.statusCode).toBe(400);
   });
 
-  it("BUG: LIKE wildcards in bookName are not escaped — '%' is reported as a duplicate of any book", async () => {
-    // library-routes.ts:31 uses ILike(userInput) for an equality check.
+  it("rejects non-string fields with 400 (schema validation, no coercion)", async () => {
+    const res = await post(bookInput({ authorName: 42 }));
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ status: "ERROR", data: null, message: "Invalid Input : Provide Required input for authorName" });
+    expect(fakeDb.library.rows).toHaveLength(0);
+  });
+
+  it("matches LIKE wildcards literally — '%' is not a duplicate of an unrelated book", async () => {
     seedBook({ bookName: "Some Other Title" });
     const res = await post(bookInput({ bookName: "%" }));
-    expect(res.json().status).toBe("ERROR");
-    expect(res.json().message).toBe("Invalid Input : % Is Already In The Library");
+    expect(res.json().status).toBe("SUCCESS");
+    expect(fakeDb.library.rows.map((b) => b.bookName)).toEqual(["Some Other Title", "%"]);
+  });
+
+  it("matches '_' literally in the duplicate check", async () => {
+    seedBook({ bookName: "Cat" });
+    const res = await post(bookInput({ bookName: "C_t" }));
+    expect(res.json().status).toBe("SUCCESS");
+  });
+
+  it("still detects a duplicate of a title that contains wildcard characters", async () => {
+    seedBook({ bookName: "100% Pure_Gold" });
+    const res = await post(bookInput({ bookName: "100% pure_gold" }));
+    expect(res.json().message).toBe("Invalid Input : 100% pure_gold Is Already In The Library");
   });
 });
 
@@ -126,12 +147,20 @@ describe("PUT /updatebook (admin)", () => {
     expect(row.updatedAt).toBeNull();
   });
 
-  it("BUG: LIKE wildcards are not escaped — bookName '%' updates an arbitrary (first) book", async () => {
-    // library-routes.ts:99 uses ILike(bookName) to locate the book to update.
+  it("matches LIKE wildcards literally — bookName '%' does not update an arbitrary book", async () => {
     const row = seedBook({ bookName: "Real Title" });
     const res = await put({ bookName: "%", authorName: "Hijacked" });
+    expect(res.json()).toEqual({ status: "ERROR", data: null, message: "The Book % Is Not Found In The Library" });
+    expect(row.authorName).toBe("Frank Herbert");
+  });
+
+  it("updates a book whose title contains wildcard characters", async () => {
+    const other = seedBook({ bookName: "50 Percent" });
+    const row = seedBook({ bookName: "50%" });
+    const res = await put({ bookName: "50%", genre: "Maths" });
     expect(res.json().status).toBe("SUCCESS");
-    expect(row.authorName).toBe("Hijacked");
+    expect(row.genre).toBe("Maths");
+    expect(other.genre).toBe("Sci-Fi");
   });
 });
 
@@ -205,6 +234,13 @@ describe("GET /getbookbyquery (user)", () => {
     seedBook();
     const res = await query("?bookName=dune");
     expect(res.json()).toEqual({ status: "ERROR", data: null, message: "The Request Is Not Available" });
+  });
+
+  it("rejects a repeated (array) filter with 400", async () => {
+    seedBook();
+    const res = await query("?genre=Sci-Fi&genre=Romance");
+    expect(res.statusCode).toBe(400);
+    expect(res.json().status).toBe("ERROR");
   });
 
   it("ignores unknown query params; only unknown params counts as no input", async () => {
